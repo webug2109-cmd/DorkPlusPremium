@@ -21,6 +21,9 @@ from modules.web_crawler import WebCrawler
 from modules.keyword_extractor import KeywordExtractor
 from modules.sqli_scanner import SqliScanner
 from modules.sql_dumper import SqlDumper
+from modules.license_manager import LicenseGenerator, LicenseKey
+from modules.utilities import HashIdentifier, EncoderDecoder, UserAgentGenerator
+from modules.network_tools import ProxyTester, PortScanner
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -446,13 +449,146 @@ async def delete_task(task_id: str):
     return {'message': 'Task deleted successfully'}
 
 
+# ==================== LICENSE MANAGEMENT ====================
+
+@api_router.post("/license/generate")
+async def generate_license(duration: str):
+    """Generate a new license key"""
+    try:
+        license = LicenseGenerator.create_license(duration)
+        await db.licenses.insert_one(license.dict())
+        return license.dict()
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@api_router.post("/license/validate")
+async def validate_license(key: str):
+    """Validate a license key"""
+    license = await db.licenses.find_one({'key': key}, {'_id': 0})
+    if not license:
+        return {'valid': False, 'message': 'Invalid license key'}
+    
+    license_obj = LicenseKey(**license)
+    
+    if not license_obj.isActive:
+        return {'valid': False, 'message': 'License key is deactivated'}
+    
+    if datetime.utcnow() > license_obj.expiresAt:
+        return {'valid': False, 'message': 'License key has expired'}
+    
+    return {
+        'valid': True,
+        'duration': license_obj.duration,
+        'expiresAt': license_obj.expiresAt.isoformat()
+    }
+
+@api_router.get("/license/generate-bulk/{duration}/{count}")
+async def generate_bulk_licenses(duration: str, count: int):
+    """Generate multiple license keys"""
+    if count > 100:
+        raise HTTPException(status_code=400, detail="Maximum 100 keys per request")
+    
+    licenses = []
+    for _ in range(count):
+        license = LicenseGenerator.create_license(duration)
+        await db.licenses.insert_one(license.dict())
+        licenses.append(license.dict())
+    
+    return {'licenses': licenses, 'count': len(licenses)}
+
+
+# ==================== UTILITIES ====================
+
+@api_router.post("/utilities/hash/identify")
+async def identify_hash(hash_string: str):
+    """Identify hash type"""
+    types = HashIdentifier.identify(hash_string)
+    return {'hash': hash_string, 'possibleTypes': types}
+
+@api_router.post("/utilities/hash/generate")
+async def generate_hash(text: str, algorithm: str = 'md5'):
+    """Generate hash from text"""
+    try:
+        hash_value = HashIdentifier.hash_text(text, algorithm)
+        return {'text': text, 'algorithm': algorithm, 'hash': hash_value}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@api_router.post("/utilities/encode/base64")
+async def encode_base64(text: str):
+    """Encode to base64"""
+    encoded = EncoderDecoder.base64_encode(text)
+    return {'original': text, 'encoded': encoded}
+
+@api_router.post("/utilities/decode/base64")
+async def decode_base64(encoded: str):
+    """Decode from base64"""
+    decoded = EncoderDecoder.base64_decode(encoded)
+    return {'encoded': encoded, 'decoded': decoded}
+
+@api_router.post("/utilities/encode/url")
+async def encode_url(text: str):
+    """URL encode"""
+    encoded = EncoderDecoder.url_encode(text)
+    return {'original': text, 'encoded': encoded}
+
+@api_router.post("/utilities/decode/url")
+async def decode_url(encoded: str):
+    """URL decode"""
+    decoded = EncoderDecoder.url_decode(encoded)
+    return {'encoded': encoded, 'decoded': decoded}
+
+@api_router.get("/utilities/useragent/random")
+async def get_random_useragent():
+    """Get random user agent"""
+    ua = UserAgentGenerator.get_random()
+    return {'userAgent': ua}
+
+@api_router.get("/utilities/useragent/all")
+async def get_all_useragents():
+    """Get all user agents"""
+    uas = UserAgentGenerator.get_all()
+    return {'userAgents': uas, 'count': len(uas)}
+
+
+# ==================== NETWORK TOOLS ====================
+
+@api_router.post("/network/proxy/test")
+async def test_proxy(proxy: str):
+    """Test a single proxy"""
+    result = await ProxyTester.test_proxy(proxy)
+    return result
+
+@api_router.post("/network/proxy/test-multiple")
+async def test_multiple_proxies(proxies: list):
+    """Test multiple proxies"""
+    if len(proxies) > 50:
+        raise HTTPException(status_code=400, detail="Maximum 50 proxies per request")
+    
+    results = await ProxyTester.test_multiple(proxies)
+    working = [r for r in results if r['status'] == 'working']
+    
+    return {
+        'total': len(results),
+        'working': len(working),
+        'results': results
+    }
+
+@api_router.post("/network/port/scan")
+async def scan_ports(host: str):
+    """Scan common ports"""
+    results = await PortScanner.scan_common_ports(host)
+    return {'host': host, 'openPorts': results}
+
+
 # ==================== ROOT ENDPOINT ====================
 
 @api_router.get("/")
 async def root():
     return {
-        "message": "DorkPlus Security Testing API",
-        "version": "1.0.0",
+        "name": "DorkPlusPremium Security Testing API",
+        "version": "2.0.0",
+        "author": "Frostbyt3s",
         "endpoints": {
             "statistics": "/api/statistics",
             "dork_generator": "/api/dork/generate",
@@ -460,7 +596,10 @@ async def root():
             "keyword_extractor": "/api/keywords/extract",
             "sqli_scanner": "/api/sqli/scan",
             "sql_dumper": "/api/dumper/start",
-            "tasks": "/api/tasks"
+            "tasks": "/api/tasks",
+            "license": "/api/license/generate",
+            "utilities": "/api/utilities",
+            "network_tools": "/api/network"
         }
     }
 

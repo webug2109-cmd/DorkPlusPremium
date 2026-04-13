@@ -95,6 +95,7 @@ class SqliScanner:
         self.scan_type = scan_type
         self.timeout = timeout
         self.results: List[Dict] = []
+        self.max_concurrent = 10  # Parallel requests for speed
         
     def get_payloads(self) -> List[str]:
         """Get payloads based on scan type"""
@@ -209,20 +210,24 @@ class SqliScanner:
         return None
     
     async def scan(self) -> List[Dict]:
-        """Execute SQL injection scan"""
+        """Execute SQL injection scan - ENHANCED FOR SPEED"""
         payloads = self.get_payloads()
         results = []
         
-        connector = aiohttp.TCPConnector(ssl=False, limit=5)
+        connector = aiohttp.TCPConnector(ssl=False, limit=self.max_concurrent)
         timeout_settings = aiohttp.ClientTimeout(total=self.timeout)
         
         async with aiohttp.ClientSession(connector=connector, timeout=timeout_settings) as session:
-            tasks = [self.test_payload(session, payload) for payload in payloads]
-            responses = await asyncio.gather(*tasks, return_exceptions=True)
-            
-            for response in responses:
-                if response and isinstance(response, dict):
-                    results.append(response)
+            # Process payloads in batches for maximum speed
+            batch_size = self.max_concurrent
+            for i in range(0, len(payloads), batch_size):
+                batch = payloads[i:i+batch_size]
+                tasks = [self.test_payload(session, payload) for payload in batch]
+                responses = await asyncio.gather(*tasks, return_exceptions=True)
+                
+                for response in responses:
+                    if response and isinstance(response, dict):
+                        results.append(response)
         
         # If no vulnerabilities found, add a safe result
         if not results:

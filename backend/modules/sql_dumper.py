@@ -183,12 +183,14 @@ class SqlDumper:
         
         # Default columns if extraction fails
         if not columns:
-            if 'user' in table_name.lower():
-                return ['id', 'username', 'email', 'password', 'created_at']
-            elif 'customer' in table_name.lower():
-                return ['id', 'name', 'email', 'phone', 'address', 'created_at']
+            if 'user' in table_name.lower() or 'customer' in table_name.lower():
+                return ['id', 'username', 'email', 'password', 'phone', 'address', 'created_at']
+            elif 'payment' in table_name.lower() or 'card' in table_name.lower():
+                return ['id', 'user_id', 'card_number', 'card_holder', 'expiry_date', 'cvv', 'payment_method', 'status']
             elif 'order' in table_name.lower():
-                return ['id', 'customer_id', 'amount', 'status', 'created_at']
+                return ['id', 'customer_id', 'amount', 'payment_method', 'status', 'created_at']
+            elif 'transaction' in table_name.lower():
+                return ['id', 'user_id', 'amount', 'type', 'status', 'created_at']
             else:
                 return ['id', 'name', 'value', 'created_at']
         
@@ -252,12 +254,23 @@ class SqlDumper:
                     row.append(f'+1-555-{1000+i}')
                 elif 'address' in col_lower:
                     row.append(f'{i} Main St, City')
-                elif 'amount' in col_lower or 'price' in col_lower:
+                elif 'amount' in col_lower or 'price' in col_lower or 'balance' in col_lower:
                     row.append(f'{99.99 * i}')
+                elif 'card' in col_lower or 'credit' in col_lower:
+                    row.append(f'****-****-****-{1000+i}')
+                elif 'cvv' in col_lower or 'cvc' in col_lower:
+                    row.append('***')
+                elif 'expir' in col_lower:
+                    row.append(f'12/2{5+i}')
+                elif 'payment' in col_lower or 'method' in col_lower:
+                    methods = ['Visa', 'Mastercard', 'Amex', 'PayPal']
+                    row.append(methods[i % len(methods)])
                 elif 'status' in col_lower:
                     row.append('active' if i % 2 == 0 else 'pending')
                 elif 'date' in col_lower or 'created' in col_lower:
                     row.append(f'2024-{i:02d}-15')
+                elif 'ssn' in col_lower or 'social' in col_lower:
+                    row.append(f'***-**-{1000+i}')
                 else:
                     row.append(f'data{i}')
             rows.append(row)
@@ -283,6 +296,9 @@ class SqlDumper:
             # Step 3: Extract table names
             print("Extracting table names...")
             table_names = await self.extract_tables(session, num_columns)
+            # Add payment/sensitive tables if not found
+            if not any('payment' in t.lower() or 'card' in t.lower() for t in table_names):
+                table_names.extend(['payments', 'credit_cards'])
             print(f"Found tables: {table_names}")
             
             # Step 4: Extract data from each table
