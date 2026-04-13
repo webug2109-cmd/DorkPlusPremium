@@ -20,9 +20,12 @@ const Sidebar = ({ activeModule, setActiveModule }) => {
       <div className="p-6">
         <div className="flex items-center gap-2">
           <Shield className="w-8 h-8 text-blue-500" />
-          <h1 className="text-2xl font-bold text-white">DorkPlus</h1>
+          <div>
+            <h1 className="text-2xl font-bold text-white">DorkPlus</h1>
+            <p className="text-xs text-blue-400">Premium</p>
+          </div>
         </div>
-        <p className="text-sm text-gray-400 mt-1">Security Testing Suite</p>
+        <p className="text-xs text-gray-500 mt-2">Created by <span className="text-blue-400 font-semibold">Frostbyt3s</span></p>
       </div>
 
       <div className="px-3 mb-4">

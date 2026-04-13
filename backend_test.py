@@ -1,435 +1,608 @@
 #!/usr/bin/env python3
 """
-DorkPlus Security Testing API - Comprehensive Backend Tests
-Tests all API endpoints as specified in the review request
+DorkPlusPremium v2.0.0 Backend API Testing Suite
+Tests all new features: License System, Hash Tools, Encoders, User Agents, Network Tools
 """
 
 import requests
 import json
 import time
-import sys
-from typing import Dict, Any, Optional
+from datetime import datetime
 
-# Backend URL from frontend .env
+# Backend URL from frontend environment
 BACKEND_URL = "https://dork-automation-tool.preview.emergentagent.com/api"
 
-class DorkPlusAPITester:
+class DorkPlusPremiumTester:
     def __init__(self):
         self.session = requests.Session()
         self.test_results = []
-        self.task_ids = []  # Store task IDs for cleanup
         
-    def log_test(self, test_name: str, success: bool, details: str = "", response_data: Any = None):
-        """Log test results"""
+    def log_test(self, test_name, success, details="", error=""):
+        """Log test result"""
+        result = {
+            'test': test_name,
+            'success': success,
+            'details': details,
+            'error': error,
+            'timestamp': datetime.now().isoformat()
+        }
+        self.test_results.append(result)
         status = "✅ PASS" if success else "❌ FAIL"
         print(f"{status} {test_name}")
         if details:
             print(f"   Details: {details}")
-        if response_data and not success:
-            print(f"   Response: {response_data}")
+        if error:
+            print(f"   Error: {error}")
         print()
-        
-        self.test_results.append({
-            'test': test_name,
-            'success': success,
-            'details': details,
-            'response': response_data
-        })
     
-    def make_request(self, method: str, endpoint: str, data: Dict = None, timeout: int = 30) -> tuple:
-        """Make HTTP request and return (success, response_data, status_code)"""
+    def test_api_root(self):
+        """Test API root endpoint - should show v2.0.0"""
         try:
-            url = f"{BACKEND_URL}{endpoint}"
-            print(f"Making {method} request to: {url}")
-            if data:
-                print(f"Request data: {json.dumps(data, indent=2)}")
+            response = self.session.get(f"{BACKEND_URL}/")
             
-            if method.upper() == 'GET':
-                response = self.session.get(url, timeout=timeout)
-            elif method.upper() == 'POST':
-                response = self.session.post(url, json=data, timeout=timeout)
-            elif method.upper() == 'DELETE':
-                response = self.session.delete(url, timeout=timeout)
+            if response.status_code == 200:
+                data = response.json()
+                
+                # Check required fields
+                if (data.get('name') == 'DorkPlusPremium Security Testing API' and
+                    data.get('version') == '2.0.0' and
+                    data.get('author') == 'Frostbyt3s'):
+                    
+                    self.log_test(
+                        "API Root Endpoint",
+                        True,
+                        f"Version: {data.get('version')}, Name: {data.get('name')}, Author: {data.get('author')}"
+                    )
+                else:
+                    self.log_test(
+                        "API Root Endpoint",
+                        False,
+                        f"Unexpected response data: {data}",
+                        "Missing required fields or incorrect values"
+                    )
             else:
-                return False, f"Unsupported method: {method}", 0
-            
-            print(f"Response status: {response.status_code}")
-            
-            try:
-                response_data = response.json()
-                print(f"Response data: {json.dumps(response_data, indent=2)}")
-            except:
-                response_data = response.text
-                print(f"Response text: {response_data}")
-            
-            return response.status_code < 400, response_data, response.status_code
-            
-        except requests.exceptions.Timeout:
-            return False, "Request timeout", 0
-        except requests.exceptions.ConnectionError:
-            return False, "Connection error", 0
+                self.log_test(
+                    "API Root Endpoint",
+                    False,
+                    f"HTTP {response.status_code}",
+                    response.text
+                )
         except Exception as e:
-            return False, f"Request error: {str(e)}", 0
+            self.log_test("API Root Endpoint", False, "", str(e))
     
-    def test_root_endpoint(self):
-        """Test 8: Root Endpoint - GET /api/"""
-        print("=" * 60)
-        print("TEST 8: Root Endpoint")
-        print("=" * 60)
+    def test_license_system(self):
+        """Test License System endpoints"""
         
-        success, response_data, status_code = self.make_request('GET', '/')
-        
-        if success and isinstance(response_data, dict):
-            required_fields = ['message', 'version', 'endpoints']
-            has_all_fields = all(field in response_data for field in required_fields)
+        # Test 1: Generate 1 month license
+        try:
+            response = self.session.post(f"{BACKEND_URL}/license/generate?duration=1month")
             
-            if has_all_fields:
-                self.log_test("Root endpoint returns API info", True, 
-                            f"Version: {response_data.get('version')}, Message: {response_data.get('message')}")
+            if response.status_code == 200:
+                data = response.json()
+                if 'key' in data and 'duration' in data and 'expiresAt' in data:
+                    license_key = data['key']
+                    self.log_test(
+                        "License Generate (1month)",
+                        True,
+                        f"Generated key: {license_key[:15]}..., Duration: {data['duration']}"
+                    )
+                    
+                    # Test license validation with generated key
+                    self.test_license_validation(license_key)
+                else:
+                    self.log_test(
+                        "License Generate (1month)",
+                        False,
+                        f"Missing required fields in response: {data}"
+                    )
             else:
-                self.log_test("Root endpoint returns API info", False, 
-                            f"Missing required fields. Expected: {required_fields}")
-        else:
-            self.log_test("Root endpoint returns API info", False, 
-                        f"Invalid response format or request failed", response_data)
-    
-    def test_statistics_endpoint(self):
-        """Test 1: Statistics Endpoint - GET /api/statistics"""
-        print("=" * 60)
-        print("TEST 1: Statistics Endpoint")
-        print("=" * 60)
+                self.log_test(
+                    "License Generate (1month)",
+                    False,
+                    f"HTTP {response.status_code}",
+                    response.text
+                )
+        except Exception as e:
+            self.log_test("License Generate (1month)", False, "", str(e))
         
-        success, response_data, status_code = self.make_request('GET', '/statistics')
-        
-        if success and isinstance(response_data, dict):
-            required_fields = ['totalScans', 'vulnerabilitiesFound', 'crawledPages', 
-                             'generatedDorks', 'activeScans', 'completedScans']
-            has_all_fields = all(field in response_data for field in required_fields)
+        # Test 2: Generate 1 year license
+        try:
+            response = self.session.post(f"{BACKEND_URL}/license/generate?duration=1year")
             
-            if has_all_fields:
-                self.log_test("Statistics endpoint returns all required fields", True, 
-                            f"Fields present: {list(response_data.keys())}")
+            if response.status_code == 200:
+                data = response.json()
+                if 'key' in data and data['duration'] == '1year':
+                    self.log_test(
+                        "License Generate (1year)",
+                        True,
+                        f"Generated key: {data['key'][:15]}..., Duration: {data['duration']}"
+                    )
+                else:
+                    self.log_test(
+                        "License Generate (1year)",
+                        False,
+                        f"Unexpected response: {data}"
+                    )
             else:
-                missing_fields = [f for f in required_fields if f not in response_data]
-                self.log_test("Statistics endpoint returns all required fields", False, 
-                            f"Missing fields: {missing_fields}")
-        else:
-            self.log_test("Statistics endpoint returns all required fields", False, 
-                        "Invalid response format or request failed", response_data)
-    
-    def test_dork_generator(self):
-        """Test 2: Dork Generator - POST /api/dork/generate"""
-        print("=" * 60)
-        print("TEST 2: Dork Generator")
-        print("=" * 60)
+                self.log_test(
+                    "License Generate (1year)",
+                    False,
+                    f"HTTP {response.status_code}",
+                    response.text
+                )
+        except Exception as e:
+            self.log_test("License Generate (1year)", False, "", str(e))
         
-        # Test different dork types
-        dork_types = ["admin", "database", "sensitive", "config"]
-        
-        for dork_type in dork_types:
-            test_data = {
-                "target": "example.com",
-                "dorkType": dork_type
-            }
+        # Test 3: Generate bulk licenses
+        try:
+            response = self.session.get(f"{BACKEND_URL}/license/generate-bulk/1week/5")
             
-            success, response_data, status_code = self.make_request('POST', '/dork/generate', test_data)
+            if response.status_code == 200:
+                data = response.json()
+                if 'licenses' in data and 'count' in data and data['count'] == 5:
+                    self.log_test(
+                        "License Generate Bulk (1week/5)",
+                        True,
+                        f"Generated {data['count']} licenses successfully"
+                    )
+                else:
+                    self.log_test(
+                        "License Generate Bulk (1week/5)",
+                        False,
+                        f"Unexpected response: {data}"
+                    )
+            else:
+                self.log_test(
+                    "License Generate Bulk (1week/5)",
+                    False,
+                    f"HTTP {response.status_code}",
+                    response.text
+                )
+        except Exception as e:
+            self.log_test("License Generate Bulk (1week/5)", False, "", str(e))
+    
+    def test_license_validation(self, license_key):
+        """Test license validation with a valid key"""
+        try:
+            response = self.session.post(f"{BACKEND_URL}/license/validate?key={license_key}")
             
-            if success and isinstance(response_data, dict):
-                if 'dorks' in response_data and isinstance(response_data['dorks'], list):
-                    dorks_count = len(response_data['dorks'])
-                    self.log_test(f"Dork generation for type '{dork_type}'", True, 
-                                f"Generated {dorks_count} dorks")
+            if response.status_code == 200:
+                data = response.json()
+                if data.get('valid') == True:
+                    self.log_test(
+                        "License Validation",
+                        True,
+                        f"Valid license confirmed, expires: {data.get('expiresAt', 'N/A')}"
+                    )
                 else:
-                    self.log_test(f"Dork generation for type '{dork_type}'", False, 
-                                "Response missing 'dorks' array", response_data)
+                    self.log_test(
+                        "License Validation",
+                        False,
+                        f"License marked as invalid: {data}"
+                    )
             else:
-                self.log_test(f"Dork generation for type '{dork_type}'", False, 
-                            "Request failed or invalid response", response_data)
+                self.log_test(
+                    "License Validation",
+                    False,
+                    f"HTTP {response.status_code}",
+                    response.text
+                )
+        except Exception as e:
+            self.log_test("License Validation", False, "", str(e))
     
-    def test_web_crawler(self):
-        """Test 3: Web Crawler - POST /api/crawler/start and GET /api/crawler/results/{taskId}"""
-        print("=" * 60)
-        print("TEST 3: Web Crawler")
-        print("=" * 60)
+    def test_hash_tools(self):
+        """Test Hash Tools utilities"""
         
-        # Start crawler
-        crawler_data = {
-            "url": "https://example.com",
-            "depth": 2
-        }
-        
-        success, response_data, status_code = self.make_request('POST', '/crawler/start', crawler_data)
-        
-        if success and isinstance(response_data, dict):
-            if 'taskId' in response_data and 'status' in response_data:
-                task_id = response_data['taskId']
-                self.task_ids.append(task_id)
-                self.log_test("Crawler start request", True, 
-                            f"Task ID: {task_id}, Status: {response_data['status']}")
-                
-                # Wait a moment for task to process
-                time.sleep(2)
-                
-                # Check results
-                success_results, results_data, _ = self.make_request('GET', f'/crawler/results/{task_id}')
-                
-                if success_results and isinstance(results_data, dict):
-                    if 'task' in results_data:
-                        task_status = results_data['task'].get('status', 'unknown')
-                        self.log_test("Crawler results retrieval", True, 
-                                    f"Task status: {task_status}")
-                    else:
-                        self.log_test("Crawler results retrieval", False, 
-                                    "Response missing 'task' field", results_data)
-                else:
-                    self.log_test("Crawler results retrieval", False, 
-                                "Failed to retrieve results", results_data)
-            else:
-                self.log_test("Crawler start request", False, 
-                            "Response missing 'taskId' or 'status'", response_data)
-        else:
-            self.log_test("Crawler start request", False, 
-                        "Request failed or invalid response", response_data)
-    
-    def test_keyword_extractor(self):
-        """Test 4: Keyword Extractor - POST /api/keywords/extract"""
-        print("=" * 60)
-        print("TEST 4: Keyword Extractor")
-        print("=" * 60)
-        
-        test_data = {
-            "customText": "This is a test with admin password login database credentials"
-        }
-        
-        success, response_data, status_code = self.make_request('POST', '/keywords/extract', test_data)
-        
-        if success and isinstance(response_data, dict):
-            if 'keywords' in response_data and isinstance(response_data['keywords'], list):
-                keywords = response_data['keywords']
-                expected_keywords = ["admin", "password", "login", "database"]
-                found_keywords = [kw for kw in expected_keywords if kw in keywords]
-                
-                self.log_test("Keyword extraction", True, 
-                            f"Extracted {len(keywords)} keywords, found expected: {found_keywords}")
-            else:
-                self.log_test("Keyword extraction", False, 
-                            "Response missing 'keywords' array", response_data)
-        else:
-            self.log_test("Keyword extraction", False, 
-                        "Request failed or invalid response", response_data)
-    
-    def test_sqli_scanner(self):
-        """Test 5: SQLi Scanner - POST /api/sqli/scan and GET /api/sqli/results/{taskId}"""
-        print("=" * 60)
-        print("TEST 5: SQLi Scanner")
-        print("=" * 60)
-        
-        # Start SQLi scan
-        sqli_data = {
-            "targetUrl": "https://example.com/test.php?id=1",
-            "scanType": "auto"
-        }
-        
-        success, response_data, status_code = self.make_request('POST', '/sqli/scan', sqli_data)
-        
-        if success and isinstance(response_data, dict):
-            if 'taskId' in response_data and 'status' in response_data:
-                task_id = response_data['taskId']
-                self.task_ids.append(task_id)
-                expected_status = "scanning"
-                actual_status = response_data['status']
-                
-                if actual_status == expected_status:
-                    self.log_test("SQLi scan start", True, 
-                                f"Task ID: {task_id}, Status: {actual_status}")
-                else:
-                    self.log_test("SQLi scan start", False, 
-                                f"Expected status '{expected_status}', got '{actual_status}'")
-                
-                # Wait a moment for task to process
-                time.sleep(2)
-                
-                # Check results
-                success_results, results_data, _ = self.make_request('GET', f'/sqli/results/{task_id}')
-                
-                if success_results and isinstance(results_data, dict):
-                    if 'task' in results_data:
-                        task_status = results_data['task'].get('status', 'unknown')
-                        self.log_test("SQLi results retrieval", True, 
-                                    f"Task status: {task_status}")
-                    else:
-                        self.log_test("SQLi results retrieval", False, 
-                                    "Response missing 'task' field", results_data)
-                else:
-                    self.log_test("SQLi results retrieval", False, 
-                                "Failed to retrieve results", results_data)
-            else:
-                self.log_test("SQLi scan start", False, 
-                            "Response missing 'taskId' or 'status'", response_data)
-        else:
-            self.log_test("SQLi scan start", False, 
-                        "Request failed or invalid response", response_data)
-    
-    def test_sql_dumper(self):
-        """Test 6: SQL Dumper - POST /api/dumper/start and GET /api/dumper/results/{taskId}"""
-        print("=" * 60)
-        print("TEST 6: SQL Dumper")
-        print("=" * 60)
-        
-        # Start SQL dumper
-        dumper_data = {
-            "targetUrl": "https://example.com/vuln.php?id=1"
-        }
-        
-        success, response_data, status_code = self.make_request('POST', '/dumper/start', dumper_data)
-        
-        if success and isinstance(response_data, dict):
-            if 'taskId' in response_data and 'status' in response_data:
-                task_id = response_data['taskId']
-                self.task_ids.append(task_id)
-                expected_status = "dumping"
-                actual_status = response_data['status']
-                
-                if actual_status == expected_status:
-                    self.log_test("SQL dumper start", True, 
-                                f"Task ID: {task_id}, Status: {actual_status}")
-                else:
-                    self.log_test("SQL dumper start", False, 
-                                f"Expected status '{expected_status}', got '{actual_status}'")
-                
-                # Wait a moment for task to process
-                time.sleep(2)
-                
-                # Check results
-                success_results, results_data, _ = self.make_request('GET', f'/dumper/results/{task_id}')
-                
-                if success_results and isinstance(results_data, dict):
-                    if 'task' in results_data:
-                        task_status = results_data['task'].get('status', 'unknown')
-                        self.log_test("SQL dumper results retrieval", True, 
-                                    f"Task status: {task_status}")
-                    else:
-                        self.log_test("SQL dumper results retrieval", False, 
-                                    "Response missing 'task' field", results_data)
-                else:
-                    self.log_test("SQL dumper results retrieval", False, 
-                                "Failed to retrieve results", results_data)
-            else:
-                self.log_test("SQL dumper start", False, 
-                            "Response missing 'taskId' or 'status'", response_data)
-        else:
-            self.log_test("SQL dumper start", False, 
-                        "Request failed or invalid response", response_data)
-    
-    def test_tasks_management(self):
-        """Test 7: Tasks Management - GET /api/tasks, GET /api/tasks/{taskId}, DELETE /api/tasks/{taskId}"""
-        print("=" * 60)
-        print("TEST 7: Tasks Management")
-        print("=" * 60)
-        
-        # Get all tasks
-        success, response_data, status_code = self.make_request('GET', '/tasks')
-        
-        if success and isinstance(response_data, list):
-            self.log_test("Get all tasks", True, 
-                        f"Retrieved {len(response_data)} tasks")
+        # Test 1: Hash identification
+        try:
+            test_hash = "5d41402abc4b2a76b9719d911017c592"  # MD5 of "hello"
+            response = self.session.post(f"{BACKEND_URL}/utilities/hash/identify?hash_string={test_hash}")
             
-            # Test specific task retrieval if we have task IDs
-            if self.task_ids:
-                task_id = self.task_ids[0]
-                success_specific, specific_data, _ = self.make_request('GET', f'/tasks/{task_id}')
-                
-                if success_specific and isinstance(specific_data, dict):
-                    if 'id' in specific_data:
-                        self.log_test("Get specific task", True, 
-                                    f"Retrieved task with ID: {specific_data['id']}")
-                    else:
-                        self.log_test("Get specific task", False, 
-                                    "Response missing 'id' field", specific_data)
+            if response.status_code == 200:
+                data = response.json()
+                if 'possibleTypes' in data and 'MD5' in data['possibleTypes']:
+                    self.log_test(
+                        "Hash Identification",
+                        True,
+                        f"Correctly identified MD5 hash. Types: {data['possibleTypes']}"
+                    )
                 else:
-                    self.log_test("Get specific task", False, 
-                                "Failed to retrieve specific task", specific_data)
-                
-                # Test task deletion
-                success_delete, delete_data, _ = self.make_request('DELETE', f'/tasks/{task_id}')
-                
-                if success_delete:
-                    self.log_test("Delete task", True, 
-                                f"Successfully deleted task {task_id}")
-                    # Remove from our list since it's deleted
-                    self.task_ids.remove(task_id)
-                else:
-                    self.log_test("Delete task", False, 
-                                "Failed to delete task", delete_data)
+                    self.log_test(
+                        "Hash Identification",
+                        False,
+                        f"Failed to identify MD5 hash: {data}"
+                    )
             else:
-                self.log_test("Get specific task", False, 
-                            "No task IDs available for testing")
-                self.log_test("Delete task", False, 
-                            "No task IDs available for testing")
-        else:
-            self.log_test("Get all tasks", False, 
-                        "Request failed or invalid response format", response_data)
-    
-    def cleanup_tasks(self):
-        """Clean up any remaining test tasks"""
-        print("=" * 60)
-        print("CLEANUP: Removing test tasks")
-        print("=" * 60)
+                self.log_test(
+                    "Hash Identification",
+                    False,
+                    f"HTTP {response.status_code}",
+                    response.text
+                )
+        except Exception as e:
+            self.log_test("Hash Identification", False, "", str(e))
         
-        for task_id in self.task_ids:
-            success, response_data, _ = self.make_request('DELETE', f'/tasks/{task_id}')
-            if success:
-                print(f"✅ Cleaned up task: {task_id}")
+        # Test 2: SHA256 hash generation
+        try:
+            response = self.session.post(f"{BACKEND_URL}/utilities/hash/generate?text=hello&algorithm=sha256")
+            
+            if response.status_code == 200:
+                data = response.json()
+                expected_sha256 = "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"  # Full SHA256 of "hello"
+                if (data.get('algorithm') == 'sha256' and 
+                    data.get('text') == 'hello' and 
+                    data.get('hash') == expected_sha256):
+                    self.log_test(
+                        "Hash Generation (SHA256)",
+                        True,
+                        f"Generated correct SHA256: {data['hash'][:32]}..."
+                    )
+                else:
+                    self.log_test(
+                        "Hash Generation (SHA256)",
+                        False,
+                        f"Unexpected hash result: {data}",
+                        f"Expected: {expected_sha256}, Got: {data.get('hash')}"
+                    )
             else:
-                print(f"❌ Failed to clean up task: {task_id}")
+                self.log_test(
+                    "Hash Generation (SHA256)",
+                    False,
+                    f"HTTP {response.status_code}",
+                    response.text
+                )
+        except Exception as e:
+            self.log_test("Hash Generation (SHA256)", False, "", str(e))
+        
+        # Test 3: MD5 hash generation
+        try:
+            response = self.session.post(f"{BACKEND_URL}/utilities/hash/generate?text=test&algorithm=md5")
+            
+            if response.status_code == 200:
+                data = response.json()
+                expected_md5 = "098f6bcd4621d373cade4e832627b4f6"  # MD5 of "test"
+                if (data.get('algorithm') == 'md5' and 
+                    data.get('text') == 'test' and 
+                    data.get('hash') == expected_md5):
+                    self.log_test(
+                        "Hash Generation (MD5)",
+                        True,
+                        f"Generated correct MD5: {data['hash']}"
+                    )
+                else:
+                    self.log_test(
+                        "Hash Generation (MD5)",
+                        False,
+                        f"Incorrect MD5 hash: {data}"
+                    )
+            else:
+                self.log_test(
+                    "Hash Generation (MD5)",
+                    False,
+                    f"HTTP {response.status_code}",
+                    response.text
+                )
+        except Exception as e:
+            self.log_test("Hash Generation (MD5)", False, "", str(e))
+    
+    def test_encoders(self):
+        """Test Encoder/Decoder utilities"""
+        
+        # Test 1: Base64 encoding
+        try:
+            test_text = "DorkPlusPremium"
+            response = self.session.post(f"{BACKEND_URL}/utilities/encode/base64?text={test_text}")
+            
+            if response.status_code == 200:
+                data = response.json()
+                expected_b64 = "RG9ya1BsdXNQcmVtaXVt"  # Base64 of "DorkPlusPremium"
+                if (data.get('original') == test_text and 
+                    data.get('encoded') == expected_b64):
+                    encoded_value = data['encoded']
+                    self.log_test(
+                        "Base64 Encoding",
+                        True,
+                        f"Encoded '{test_text}' to '{encoded_value}'"
+                    )
+                    
+                    # Test Base64 decoding
+                    self.test_base64_decoding(encoded_value, test_text)
+                else:
+                    self.log_test(
+                        "Base64 Encoding",
+                        False,
+                        f"Incorrect encoding result: {data}"
+                    )
+            else:
+                self.log_test(
+                    "Base64 Encoding",
+                    False,
+                    f"HTTP {response.status_code}",
+                    response.text
+                )
+        except Exception as e:
+            self.log_test("Base64 Encoding", False, "", str(e))
+        
+        # Test 2: URL encoding
+        try:
+            test_text = "hello world test"
+            response = self.session.post(f"{BACKEND_URL}/utilities/encode/url?text={test_text}")
+            
+            if response.status_code == 200:
+                data = response.json()
+                expected_url = "hello%20world%20test"
+                if (data.get('original') == test_text and 
+                    data.get('encoded') == expected_url):
+                    encoded_value = data['encoded']
+                    self.log_test(
+                        "URL Encoding",
+                        True,
+                        f"Encoded '{test_text}' to '{encoded_value}'"
+                    )
+                    
+                    # Test URL decoding
+                    self.test_url_decoding(encoded_value, test_text)
+                else:
+                    self.log_test(
+                        "URL Encoding",
+                        False,
+                        f"Incorrect URL encoding: {data}"
+                    )
+            else:
+                self.log_test(
+                    "URL Encoding",
+                    False,
+                    f"HTTP {response.status_code}",
+                    response.text
+                )
+        except Exception as e:
+            self.log_test("URL Encoding", False, "", str(e))
+    
+    def test_base64_decoding(self, encoded_value, expected_text):
+        """Test Base64 decoding"""
+        try:
+            response = self.session.post(f"{BACKEND_URL}/utilities/decode/base64?encoded={encoded_value}")
+            
+            if response.status_code == 200:
+                data = response.json()
+                if (data.get('encoded') == encoded_value and 
+                    data.get('decoded') == expected_text):
+                    self.log_test(
+                        "Base64 Decoding",
+                        True,
+                        f"Decoded '{encoded_value}' to '{data['decoded']}'"
+                    )
+                else:
+                    self.log_test(
+                        "Base64 Decoding",
+                        False,
+                        f"Incorrect decoding result: {data}"
+                    )
+            else:
+                self.log_test(
+                    "Base64 Decoding",
+                    False,
+                    f"HTTP {response.status_code}",
+                    response.text
+                )
+        except Exception as e:
+            self.log_test("Base64 Decoding", False, "", str(e))
+    
+    def test_url_decoding(self, encoded_value, expected_text):
+        """Test URL decoding"""
+        try:
+            # URL encode the parameter to prevent double-decoding by HTTP request
+            import urllib.parse
+            url_param = urllib.parse.quote(encoded_value)
+            response = self.session.post(f"{BACKEND_URL}/utilities/decode/url?encoded={url_param}")
+            
+            if response.status_code == 200:
+                data = response.json()
+                if (data.get('encoded') == encoded_value and 
+                    data.get('decoded') == expected_text):
+                    self.log_test(
+                        "URL Decoding",
+                        True,
+                        f"Decoded '{encoded_value}' to '{data['decoded']}'"
+                    )
+                else:
+                    self.log_test(
+                        "URL Decoding",
+                        False,
+                        f"Incorrect URL decoding: {data}",
+                        f"Expected decoded: '{expected_text}', got: '{data.get('decoded')}'"
+                    )
+            else:
+                self.log_test(
+                    "URL Decoding",
+                    False,
+                    f"HTTP {response.status_code}",
+                    response.text
+                )
+        except Exception as e:
+            self.log_test("URL Decoding", False, "", str(e))
+    
+    def test_user_agents(self):
+        """Test User Agent utilities"""
+        
+        # Test 1: Random user agent
+        try:
+            response = self.session.get(f"{BACKEND_URL}/utilities/useragent/random")
+            
+            if response.status_code == 200:
+                data = response.json()
+                if 'userAgent' in data and len(data['userAgent']) > 50:
+                    self.log_test(
+                        "Random User Agent",
+                        True,
+                        f"Generated user agent: {data['userAgent'][:60]}..."
+                    )
+                else:
+                    self.log_test(
+                        "Random User Agent",
+                        False,
+                        f"Invalid user agent response: {data}"
+                    )
+            else:
+                self.log_test(
+                    "Random User Agent",
+                    False,
+                    f"HTTP {response.status_code}",
+                    response.text
+                )
+        except Exception as e:
+            self.log_test("Random User Agent", False, "", str(e))
+        
+        # Test 2: All user agents
+        try:
+            response = self.session.get(f"{BACKEND_URL}/utilities/useragent/all")
+            
+            if response.status_code == 200:
+                data = response.json()
+                if ('userAgents' in data and 'count' in data and 
+                    isinstance(data['userAgents'], list) and 
+                    data['count'] > 5):
+                    self.log_test(
+                        "All User Agents",
+                        True,
+                        f"Retrieved {data['count']} user agents"
+                    )
+                else:
+                    self.log_test(
+                        "All User Agents",
+                        False,
+                        f"Invalid user agents list: {data}"
+                    )
+            else:
+                self.log_test(
+                    "All User Agents",
+                    False,
+                    f"HTTP {response.status_code}",
+                    response.text
+                )
+        except Exception as e:
+            self.log_test("All User Agents", False, "", str(e))
+    
+    def test_network_tools(self):
+        """Test Network Tools"""
+        
+        # Test 1: Proxy testing
+        try:
+            # Test with a simple proxy format using query parameter
+            test_proxy = "8.8.8.8:80"
+            response = self.session.post(f"{BACKEND_URL}/network/proxy/test?proxy={test_proxy}")
+            
+            if response.status_code == 200:
+                data = response.json()
+                if 'proxy' in data and 'status' in data:
+                    self.log_test(
+                        "Proxy Testing",
+                        True,
+                        f"Tested proxy {data['proxy']}, Status: {data['status']}"
+                    )
+                else:
+                    self.log_test(
+                        "Proxy Testing",
+                        False,
+                        f"Invalid proxy test response: {data}"
+                    )
+            else:
+                self.log_test(
+                    "Proxy Testing",
+                    False,
+                    f"HTTP {response.status_code}",
+                    response.text
+                )
+        except Exception as e:
+            self.log_test("Proxy Testing", False, "", str(e))
+        
+        # Test 2: Port scanning
+        try:
+            response = self.session.post(f"{BACKEND_URL}/network/port/scan?host=google.com")
+            
+            if response.status_code == 200:
+                data = response.json()
+                if 'host' in data and 'openPorts' in data:
+                    open_ports = data['openPorts']
+                    self.log_test(
+                        "Port Scanning",
+                        True,
+                        f"Scanned {data['host']}, Found {len(open_ports)} open ports"
+                    )
+                else:
+                    self.log_test(
+                        "Port Scanning",
+                        False,
+                        f"Invalid port scan response: {data}"
+                    )
+            else:
+                self.log_test(
+                    "Port Scanning",
+                    False,
+                    f"HTTP {response.status_code}",
+                    response.text
+                )
+        except Exception as e:
+            self.log_test("Port Scanning", False, "", str(e))
     
     def run_all_tests(self):
-        """Run all tests in the specified order"""
-        print("🚀 Starting DorkPlus Security Testing API Tests")
-        print("=" * 80)
+        """Run all DorkPlusPremium v2.0.0 tests"""
+        print("=" * 60)
+        print("DorkPlusPremium v2.0.0 Backend API Testing Suite")
+        print("=" * 60)
+        print()
         
-        # Run tests in order
-        self.test_root_endpoint()
-        self.test_statistics_endpoint()
-        self.test_dork_generator()
-        self.test_web_crawler()
-        self.test_keyword_extractor()
-        self.test_sqli_scanner()
-        self.test_sql_dumper()
-        self.test_tasks_management()
+        # Test API Root
+        self.test_api_root()
         
-        # Cleanup
-        if self.task_ids:
-            self.cleanup_tasks()
+        # Test License System
+        print("🔑 Testing License System...")
+        self.test_license_system()
+        
+        # Test Hash Tools
+        print("🔐 Testing Hash Tools...")
+        self.test_hash_tools()
+        
+        # Test Encoders
+        print("📝 Testing Encoders/Decoders...")
+        self.test_encoders()
+        
+        # Test User Agents
+        print("🌐 Testing User Agent Tools...")
+        self.test_user_agents()
+        
+        # Test Network Tools
+        print("🌍 Testing Network Tools...")
+        self.test_network_tools()
         
         # Summary
         self.print_summary()
     
     def print_summary(self):
         """Print test summary"""
-        print("=" * 80)
+        print("=" * 60)
         print("TEST SUMMARY")
-        print("=" * 80)
+        print("=" * 60)
         
-        total_tests = len(self.test_results)
-        passed_tests = sum(1 for result in self.test_results if result['success'])
-        failed_tests = total_tests - passed_tests
+        passed = sum(1 for result in self.test_results if result['success'])
+        failed = len(self.test_results) - passed
         
-        print(f"Total Tests: {total_tests}")
-        print(f"Passed: {passed_tests}")
-        print(f"Failed: {failed_tests}")
-        print(f"Success Rate: {(passed_tests/total_tests)*100:.1f}%")
+        print(f"Total Tests: {len(self.test_results)}")
+        print(f"Passed: {passed}")
+        print(f"Failed: {failed}")
+        print(f"Success Rate: {(passed/len(self.test_results)*100):.1f}%")
+        print()
         
-        if failed_tests > 0:
-            print("\nFAILED TESTS:")
+        if failed > 0:
+            print("FAILED TESTS:")
             for result in self.test_results:
                 if not result['success']:
-                    print(f"❌ {result['test']}: {result['details']}")
+                    print(f"❌ {result['test']}: {result['error']}")
+        else:
+            print("🎉 ALL TESTS PASSED!")
         
-        print("\n" + "=" * 80)
-        return failed_tests == 0
+        print("=" * 60)
 
 if __name__ == "__main__":
-    tester = DorkPlusAPITester()
-    success = tester.run_all_tests()
-    sys.exit(0 if success else 1)
+    tester = DorkPlusPremiumTester()
+    tester.run_all_tests()

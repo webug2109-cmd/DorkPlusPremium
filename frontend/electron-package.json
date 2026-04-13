@@ -1,0 +1,45 @@
+{
+  "name": "dorkpluspremium",
+  "version": "2.0.0",
+  "description": "Advanced Security Testing Suite by Frostbyt3s",
+  "author": "Frostbyt3s",
+  "main": "public/electron.js",
+  "homepage": "./",
+  "build": {
+    "appId": "com.frostbyt3s.dorkpluspremium",
+    "productName": "DorkPlusPremium",
+    "files": [
+      "build/**/*",
+      "node_modules/**/*",
+      "public/electron.js"
+    ],
+    "directories": {
+      "buildResources": "public"
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "public/icon.png"
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "icon": "public/icon.png",
+      "category": "Development"
+    },
+    "mac": {
+      "target": "dmg",
+      "icon": "public/icon.png"
+    }
+  },
+  "scripts": {
+    "electron:dev": "concurrently \"BROWSER=none yarn start\" \"wait-on http://localhost:3000 && electron .\"",
+    "electron:build": "yarn build && electron-builder",
+    "electron:build:win": "yarn build && electron-builder --windows",
+    "electron:build:mac": "yarn build && electron-builder --mac",
+    "electron:build:linux": "yarn build && electron-builder --linux"
+  }
+}

@@ -7,6 +7,9 @@ import WebCrawler from './components/WebCrawler';
 import KeywordGenerator from './components/KeywordGenerator';
 import SqliScanner from './components/SqliScanner';
 import Dumper from './components/Dumper';
+import TasksManager from './components/TasksManager';
+import Utilities from './components/Utilities';
+import Settings from './components/Settings';
 import { Toaster } from './components/ui/toaster';
 
 function App() {
@@ -27,26 +30,11 @@ function App() {
       case 'dumper':
         return <Dumper />;
       case 'tasks':
-        return (
-          <div className="p-8">
-            <h2 className="text-3xl font-bold text-white mb-2">Tasks</h2>
-            <p className="text-gray-400">Task management coming soon...</p>
-          </div>
-        );
+        return <TasksManager />;
       case 'utilities':
-        return (
-          <div className="p-8">
-            <h2 className="text-3xl font-bold text-white mb-2">Utilities</h2>
-            <p className="text-gray-400">Additional utilities coming soon...</p>
-          </div>
-        );
+        return <Utilities />;
       case 'settings':
-        return (
-          <div className="p-8">
-            <h2 className="text-3xl font-bold text-white mb-2">Settings</h2>
-            <p className="text-gray-400">Application settings coming soon...</p>
-          </div>
-        );
+        return <Settings />;
       default:
         return <Dashboard />;
     }
