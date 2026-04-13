@@ -1,33 +1,70 @@
-import React, { useState } from 'react';
-import { Globe, Play, Download, ExternalLink } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Globe, Play, Download, ExternalLink, RefreshCw } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
-import { mockCrawlResults } from '../mock/data';
 import { toast } from '../hooks/use-toast';
 import { Badge } from './ui/badge';
+import { Progress } from './ui/progress';
+import axios from 'axios';
+
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
+const API = `${BACKEND_URL}/api`;
 
 const WebCrawler = () => {
   const [url, setUrl] = useState('');
   const [depth, setDepth] = useState(2);
   const [results, setResults] = useState([]);
   const [isScanning, setIsScanning] = useState(false);
+  const [taskId, setTaskId] = useState(null);
+  const [task, setTask] = useState(null);
 
-  const handleCrawl = () => {
+  useEffect(() => {
+    let interval;
+    if (taskId && isScanning) {
+      interval = setInterval(() => fetchResults(), 2000);
+    }
+    return () => clearInterval(interval);
+  }, [taskId, isScanning]);
+
+  const fetchResults = async () => {
+    if (!taskId) return;
+    
+    try {
+      const response = await axios.get(`${API}/crawler/results/${taskId}`);
+      setTask(response.data.task);
+      
+      if (response.data.task.status === 'completed') {
+        setResults(response.data.results);
+        setIsScanning(false);
+        toast({ title: 'Crawl Complete', description: `Found ${response.data.results.length} pages` });
+      } else if (response.data.task.status === 'failed') {
+        setIsScanning(false);
+        toast({ title: 'Crawl Failed', description: response.data.task.error, variant: 'destructive' });
+      }
+    } catch (error) {
+      console.error('Error fetching results:', error);
+    }
+  };
+
+  const handleCrawl = async () => {
     if (!url) {
       toast({ title: 'Error', description: 'Please enter a URL', variant: 'destructive' });
       return;
     }
 
     setIsScanning(true);
-    toast({ title: 'Crawling Started', description: `Scanning ${url}...` });
-
-    setTimeout(() => {
-      setResults(mockCrawlResults);
+    setResults([]);
+    
+    try {
+      const response = await axios.post(`${API}/crawler/start`, { url, depth });
+      setTaskId(response.data.taskId);
+      toast({ title: 'Crawling Started', description: `Scanning ${url}...` });
+    } catch (error) {
       setIsScanning(false);
-      toast({ title: 'Crawl Complete', description: `Found ${mockCrawlResults.length} pages` });
-    }, 2000);
+      toast({ title: 'Error', description: 'Failed to start crawl', variant: 'destructive' });
+    }
   };
 
   const getStatusColor = (status) => {
@@ -84,6 +121,16 @@ const WebCrawler = () => {
             <Play className="w-4 h-4 mr-2" />
             {isScanning ? 'Crawling...' : 'Start Crawl'}
           </Button>
+          
+          {task && isScanning && (
+            <div className="mt-4 space-y-2">
+              <div className="flex justify-between text-sm text-gray-400">
+                <span>Progress</span>
+                <span>{task.progress}%</span>
+              </div>
+              <Progress value={task.progress} className="h-2" />
+            </div>
+          )}
         </CardContent>
       </Card>
 

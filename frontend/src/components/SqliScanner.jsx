@@ -1,45 +1,83 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Shield, Play, AlertTriangle, Download, CheckCircle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { mockSqliResults } from '../mock/data';
 import { toast } from '../hooks/use-toast';
 import { Badge } from './ui/badge';
 import { Alert, AlertDescription } from './ui/alert';
+import { Progress } from './ui/progress';
+import axios from 'axios';
+
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
+const API = `${BACKEND_URL}/api`;
 
 const SqliScanner = () => {
   const [targetUrl, setTargetUrl] = useState('');
   const [scanType, setScanType] = useState('auto');
   const [results, setResults] = useState([]);
   const [isScanning, setIsScanning] = useState(false);
+  const [taskId, setTaskId] = useState(null);
+  const [task, setTask] = useState(null);
 
-  const handleScan = () => {
+  useEffect(() => {
+    let interval;
+    if (taskId && isScanning) {
+      interval = setInterval(() => fetchResults(), 2000);
+    }
+    return () => clearInterval(interval);
+  }, [taskId, isScanning]);
+
+  const fetchResults = async () => {
+    if (!taskId) return;
+    
+    try {
+      const response = await axios.get(`${API}/sqli/results/${taskId}`);
+      setTask(response.data.task);
+      
+      if (response.data.task.status === 'completed') {
+        setResults(response.data.results);
+        setIsScanning(false);
+        const vulnCount = response.data.results.filter(r => r.vulnerable).length;
+        toast({
+          title: 'Scan Complete',
+          description: `Found ${vulnCount} vulnerable endpoint(s)`,
+          variant: vulnCount > 0 ? 'destructive' : 'default'
+        });
+      } else if (response.data.task.status === 'failed') {
+        setIsScanning(false);
+        toast({ title: 'Scan Failed', description: response.data.task.error, variant: 'destructive' });
+      }
+    } catch (error) {
+      console.error('Error fetching results:', error);
+    }
+  };
+
+  const handleScan = async () => {
     if (!targetUrl) {
       toast({ title: 'Error', description: 'Please enter a target URL', variant: 'destructive' });
       return;
     }
 
     setIsScanning(true);
-    toast({ title: 'Scan Started', description: 'Checking for SQL injection vulnerabilities...' });
-
-    setTimeout(() => {
-      setResults(mockSqliResults);
+    setResults([]);
+    
+    try {
+      const response = await axios.post(`${API}/sqli/scan`, { targetUrl, scanType });
+      setTaskId(response.data.taskId);
+      toast({ title: 'Scan Started', description: 'Checking for SQL injection vulnerabilities...' });
+    } catch (error) {
       setIsScanning(false);
-      const vulnCount = mockSqliResults.filter(r => r.vulnerable).length;
-      toast({
-        title: 'Scan Complete',
-        description: `Found ${vulnCount} vulnerable endpoint(s)`,
-        variant: vulnCount > 0 ? 'destructive' : 'default'
-      });
-    }, 3000);
+      toast({ title: 'Error', description: 'Failed to start scan', variant: 'destructive' });
+    }
   };
 
   const getSeverityColor = (severity) => {
     const colors = {
       High: 'bg-red-500/20 text-red-400 border-red-500/30',
+      Critical: 'bg-red-600/20 text-red-300 border-red-600/30',
       Medium: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
       Low: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
       None: 'bg-green-500/20 text-green-400 border-green-500/30'
@@ -51,7 +89,7 @@ const SqliScanner = () => {
     <div className="p-8 space-y-6">
       <div>
         <h2 className="text-3xl font-bold text-white mb-2">SQL Injection Scanner</h2>
-        <p className="text-gray-400">Automated SQLi vulnerability detection and dumping</p>
+        <p className="text-gray-400">Automated SQLi vulnerability detection and analysis</p>
       </div>
 
       <Alert className="bg-yellow-500/10 border-yellow-500/30">
@@ -105,6 +143,16 @@ const SqliScanner = () => {
             <Play className="w-4 h-4 mr-2" />
             {isScanning ? 'Scanning...' : 'Start Scan'}
           </Button>
+          
+          {task && isScanning && (
+            <div className="mt-4 space-y-2">
+              <div className="flex justify-between text-sm text-gray-400">
+                <span>Progress</span>
+                <span>{task.progress}%</span>
+              </div>
+              <Progress value={task.progress} className="h-2" />
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -128,9 +176,9 @@ const SqliScanner = () => {
                 <p>No scan results yet. Start a scan to check for vulnerabilities.</p>
               </div>
             ) : (
-              results.map((result) => (
+              results.map((result, index) => (
                 <div
-                  key={result.id}
+                  key={index}
                   className="p-4 bg-[#1a1a1b] border border-gray-800 rounded-lg hover:border-gray-700 transition-all"
                 >
                   <div className="flex items-start justify-between gap-3 mb-3">
@@ -159,10 +207,20 @@ const SqliScanner = () => {
                       <p className="text-sm text-white">{result.type}</p>
                     </div>
                     {result.vulnerable && (
-                      <div>
-                        <p className="text-xs text-gray-400 mb-1">Payload</p>
-                        <code className="text-sm text-gray-300 bg-[#0a0a0b] px-2 py-1 rounded">{result.payload}</code>
-                      </div>
+                      <>
+                        <div>
+                          <p className="text-xs text-gray-400 mb-1">Payload</p>
+                          <code className="text-sm text-gray-300 bg-[#0a0a0b] px-2 py-1 rounded">{result.payload}</code>
+                        </div>
+                        {result.dbms && (
+                          <div>
+                            <p className="text-xs text-gray-400 mb-1">Database</p>
+                            <Badge className="bg-purple-500/20 text-purple-400 border-purple-500/30">
+                              {result.dbms}
+                            </Badge>
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
                 </div>

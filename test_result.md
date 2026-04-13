@@ -101,3 +101,136 @@
 #====================================================================================================
 # Testing Data - Main Agent and testing sub agent both should log testing data below this section
 #====================================================================================================
+
+user_problem_statement: "Test the DorkPlus Security Testing API with comprehensive tests for all endpoints including statistics, dork generator, web crawler, keyword extractor, SQLi scanner, SQL dumper, tasks management, and root endpoint."
+
+backend:
+  - task: "Root Endpoint API"
+    implemented: true
+    working: true
+    file: "server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          comment: "GET /api/ endpoint working correctly. Returns API info with version 1.0.0, message, and endpoints list as expected."
+
+  - task: "Statistics Endpoint"
+    implemented: true
+    working: true
+    file: "server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          comment: "GET /api/statistics endpoint working correctly. Returns all required fields: totalScans, vulnerabilitiesFound, crawledPages, generatedDorks, activeScans, completedScans, lastUpdated."
+
+  - task: "Dork Generator"
+    implemented: true
+    working: true
+    file: "server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          comment: "POST /api/dork/generate endpoint working correctly for all dork types (admin, database, sensitive, config). Each type generates 8 dorks and saves them to MongoDB successfully."
+
+  - task: "Web Crawler"
+    implemented: true
+    working: true
+    file: "server.py"
+    stuck_count: 1
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: false
+          agent: "testing"
+          comment: "Initial test failed due to MongoDB ObjectId serialization issues in task results retrieval."
+        - working: true
+          agent: "testing"
+          comment: "Fixed ObjectId serialization issue by excluding _id field from MongoDB queries and converting datetime objects to ISO strings. POST /api/crawler/start and GET /api/crawler/results/{taskId} both working correctly."
+
+  - task: "Keyword Extractor"
+    implemented: true
+    working: true
+    file: "server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          comment: "POST /api/keywords/extract endpoint working correctly. Successfully extracts security-related keywords from custom text including admin, password, login, database as expected."
+
+  - task: "SQLi Scanner"
+    implemented: true
+    working: true
+    file: "server.py"
+    stuck_count: 1
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: false
+          agent: "testing"
+          comment: "Initial test failed due to MongoDB ObjectId serialization issues in task results retrieval."
+        - working: true
+          agent: "testing"
+          comment: "Fixed ObjectId serialization issue. POST /api/sqli/scan and GET /api/sqli/results/{taskId} both working correctly. Scanner properly returns 'scanning' status and completes with vulnerability assessment."
+
+  - task: "SQL Dumper"
+    implemented: true
+    working: true
+    file: "server.py"
+    stuck_count: 2
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: false
+          agent: "testing"
+          comment: "Initial test failed due to MongoDB ObjectId serialization issues in task results retrieval."
+        - working: false
+          agent: "testing"
+          comment: "Second test failed due to datetime objects being stored in task data field causing JSON serialization errors."
+        - working: true
+          agent: "testing"
+          comment: "Fixed by creating separate copy of result for database storage and avoiding ObjectId contamination of task data field. POST /api/dumper/start and GET /api/dumper/results/{taskId} both working correctly."
+
+  - task: "Tasks Management"
+    implemented: true
+    working: true
+    file: "server.py"
+    stuck_count: 1
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: false
+          agent: "testing"
+          comment: "Initial test failed due to MongoDB ObjectId serialization issues when retrieving task lists."
+        - working: true
+          agent: "testing"
+          comment: "Fixed ObjectId serialization issue by excluding _id field from all MongoDB task queries. GET /api/tasks, GET /api/tasks/{taskId}, and DELETE /api/tasks/{taskId} all working correctly."
+
+frontend:
+  # No frontend testing performed as per instructions
+
+metadata:
+  created_by: "testing_agent"
+  version: "1.0"
+  test_sequence: 1
+  run_ui: false
+
+test_plan:
+  current_focus: []
+  stuck_tasks: []
+  test_all: true
+  test_priority: "high_first"
+
+agent_communication:
+    - agent: "testing"
+      message: "Comprehensive backend API testing completed successfully. All 8 major API endpoints tested with 16 individual test cases. Fixed critical MongoDB ObjectId serialization issues that were causing 500 Internal Server Errors. All endpoints now working correctly with 100% test success rate. Key fixes: 1) Excluded _id field from MongoDB queries, 2) Converted datetime objects to ISO strings, 3) Prevented ObjectId contamination of task data fields."

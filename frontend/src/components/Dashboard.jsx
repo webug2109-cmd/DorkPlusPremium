@@ -1,36 +1,68 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Shield, Globe, Search, AlertTriangle, Activity, TrendingUp } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
-import { mockStatistics, mockTasks } from '../mock/data';
 import { Progress } from './ui/progress';
 import { Badge } from './ui/badge';
+import axios from 'axios';
+
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
+const API = `${BACKEND_URL}/api`;
 
 const Dashboard = () => {
+  const [statistics, setStatistics] = useState(null);
+  const [tasks, setTasks] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchData();
+    const interval = setInterval(fetchData, 5000); // Refresh every 5 seconds
+    return () => clearInterval(interval);
+  }, []);
+
+  const fetchData = async () => {
+    try {
+      const [statsRes, tasksRes] = await Promise.all([
+        axios.get(`${API}/statistics`),
+        axios.get(`${API}/tasks`)
+      ]);
+      setStatistics(statsRes.data);
+      setTasks(tasksRes.data.slice(0, 3));
+      setLoading(false);
+    } catch (error) {
+      console.error('Error fetching data:', error);
+      setLoading(false);
+    }
+  };
+
+  if (loading || !statistics) {
+    return <div className="p-8 text-white">Loading...</div>;
+  }
+
   const stats = [
     {
       title: 'Total Scans',
-      value: mockStatistics.totalScans,
+      value: statistics.totalScans,
       icon: Activity,
       color: 'text-blue-500',
       bgColor: 'bg-blue-500/10'
     },
     {
       title: 'Vulnerabilities Found',
-      value: mockStatistics.vulnerabilitiesFound,
+      value: statistics.vulnerabilitiesFound,
       icon: AlertTriangle,
       color: 'text-red-500',
       bgColor: 'bg-red-500/10'
     },
     {
       title: 'Crawled Pages',
-      value: mockStatistics.crawledPages,
+      value: statistics.crawledPages,
       icon: Globe,
       color: 'text-green-500',
       bgColor: 'bg-green-500/10'
     },
     {
       title: 'Generated Dorks',
-      value: mockStatistics.generatedDorks,
+      value: statistics.generatedDorks,
       icon: Search,
       color: 'text-purple-500',
       bgColor: 'bg-purple-500/10'
@@ -86,11 +118,11 @@ const Dashboard = () => {
             <div className="space-y-4">
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-400">Active Scans</span>
-                <span className="text-xl font-bold text-blue-400">{mockStatistics.activeScans}</span>
+                <span className="text-xl font-bold text-blue-400">{statistics.activeScans}</span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-400">Completed Scans</span>
-                <span className="text-xl font-bold text-green-400">{mockStatistics.completedScans}</span>
+                <span className="text-xl font-bold text-green-400">{statistics.completedScans}</span>
               </div>
               <div className="h-32 flex items-end gap-2">
                 {[45, 67, 89, 56, 78, 90, 67, 85].map((height, i) => (
@@ -114,7 +146,7 @@ const Dashboard = () => {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {mockTasks.map((task) => (
+              {tasks.map((task) => (
                 <div key={task.id} className="space-y-2">
                   <div className="flex items-center justify-between">
                     <div className="flex-1">

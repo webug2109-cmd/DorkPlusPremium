@@ -5,9 +5,12 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
-import { mockKeywords } from '../mock/data';
 import { toast } from '../hooks/use-toast';
 import { Badge } from './ui/badge';
+import axios from 'axios';
+
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
+const API = `${BACKEND_URL}/api`;
 
 const KeywordGenerator = () => {
   const [sourceUrl, setSourceUrl] = useState('');
@@ -15,20 +18,26 @@ const KeywordGenerator = () => {
   const [keywords, setKeywords] = useState([]);
   const [isGenerating, setIsGenerating] = useState(false);
 
-  const handleGenerate = () => {
+  const handleGenerate = async () => {
     if (!sourceUrl && !customText) {
       toast({ title: 'Error', description: 'Please provide URL or text', variant: 'destructive' });
       return;
     }
 
     setIsGenerating(true);
-    toast({ title: 'Generating', description: 'Extracting keywords...' });
-
-    setTimeout(() => {
-      setKeywords([...mockKeywords, 'authentication', 'session', 'cookie', 'token', 'credential']);
+    
+    try {
+      const response = await axios.post(`${API}/keywords/extract`, {
+        sourceUrl: sourceUrl || undefined,
+        customText: customText || undefined
+      });
+      setKeywords(response.data.keywords);
+      toast({ title: 'Complete', description: `Generated ${response.data.keywords.length} keywords` });
+    } catch (error) {
+      toast({ title: 'Error', description: 'Failed to extract keywords', variant: 'destructive' });
+    } finally {
       setIsGenerating(false);
-      toast({ title: 'Complete', description: `Generated ${mockKeywords.length + 5} keywords` });
-    }, 1500);
+    }
   };
 
   const copyKeyword = (keyword) => {

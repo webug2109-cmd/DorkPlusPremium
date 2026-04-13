@@ -1,56 +1,41 @@
 import React, { useState } from 'react';
-import { Search, Copy, Download, Plus, Trash2 } from 'lucide-react';
+import { Search, Copy, Download, Plus } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { mockDorks } from '../mock/data';
 import { toast } from '../hooks/use-toast';
+import axios from 'axios';
+
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
+const API = `${BACKEND_URL}/api`;
 
 const DorkGenerator = () => {
   const [target, setTarget] = useState('');
   const [dorkType, setDorkType] = useState('admin');
   const [generatedDorks, setGeneratedDorks] = useState([]);
+  const [loading, setLoading] = useState(false);
 
-  const dorkTemplates = {
-    admin: [
-      'site:{target} inurl:admin',
-      'site:{target} intitle:"admin panel"',
-      'site:{target} inurl:"admin/login"',
-      'site:{target} inurl:wp-admin'
-    ],
-    files: [
-      'site:{target} filetype:pdf',
-      'site:{target} filetype:sql',
-      'site:{target} filetype:env',
-      'site:{target} ext:log'
-    ],
-    login: [
-      'site:{target} inurl:login.php',
-      'site:{target} intitle:"Login"',
-      'site:{target} inurl:signin',
-      'site:{target} inurl:auth'
-    ],
-    database: [
-      'site:{target} filetype:sql intext:password',
-      'site:{target} inurl:"phpMyAdmin"',
-      'site:{target} intext:"sql dump"',
-      'site:{target} ext:sql'
-    ]
-  };
-
-  const handleGenerate = () => {
+  const handleGenerate = async () => {
     if (!target) {
       toast({ title: 'Error', description: 'Please enter a target domain', variant: 'destructive' });
       return;
     }
 
-    const dorks = dorkTemplates[dorkType].map(template => 
-      template.replace('{target}', target)
-    );
-    setGeneratedDorks(dorks);
-    toast({ title: 'Success', description: `Generated ${dorks.length} dorks` });
+    setLoading(true);
+    try {
+      const response = await axios.post(`${API}/dork/generate`, {
+        target,
+        dorkType
+      });
+      setGeneratedDorks(response.data.dorks);
+      toast({ title: 'Success', description: `Generated ${response.data.dorks.length} dorks` });
+    } catch (error) {
+      toast({ title: 'Error', description: 'Failed to generate dorks', variant: 'destructive' });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const copyDork = (dork) => {
@@ -106,13 +91,15 @@ const DorkGenerator = () => {
                   <SelectItem value="files">Sensitive Files</SelectItem>
                   <SelectItem value="login">Login Pages</SelectItem>
                   <SelectItem value="database">Database Files</SelectItem>
+                  <SelectItem value="sensitive">Sensitive Data</SelectItem>
+                  <SelectItem value="config">Config Files</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
-            <Button onClick={handleGenerate} className="w-full bg-blue-500 hover:bg-blue-600">
+            <Button onClick={handleGenerate} disabled={loading} className="w-full bg-blue-500 hover:bg-blue-600">
               <Plus className="w-4 h-4 mr-2" />
-              Generate Dorks
+              {loading ? 'Generating...' : 'Generate Dorks'}
             </Button>
           </CardContent>
         </Card>
@@ -163,26 +150,6 @@ const DorkGenerator = () => {
           </CardContent>
         </Card>
       </div>
-
-      <Card className="bg-[#0f0f10] border-gray-800">
-        <CardHeader>
-          <CardTitle className="text-white">Common Dork Examples</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {mockDorks.map((dork, index) => (
-              <div
-                key={index}
-                className="flex items-center gap-2 p-3 bg-[#1a1a1b] border border-gray-800 rounded-lg hover:border-gray-700 transition-all cursor-pointer group"
-                onClick={() => copyDork(dork)}
-              >
-                <code className="flex-1 text-sm text-gray-400">{dork}</code>
-                <Copy className="w-4 h-4 text-gray-600 group-hover:text-blue-400 transition-colors" />
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 };
