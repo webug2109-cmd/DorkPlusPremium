@@ -10,7 +10,7 @@ import time
 from datetime import datetime
 
 # Backend URL from frontend environment
-BACKEND_URL = "https://dork-automation-tool.preview.emergentagent.com/api"
+BACKEND_URL = "http://localhost:8000/api"
 
 class DorkPlusPremiumTester:
     def __init__(self):

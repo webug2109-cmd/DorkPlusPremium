@@ -6,7 +6,7 @@ Quick test to isolate the failing endpoints
 import requests
 import json
 
-BACKEND_URL = "https://dork-automation-tool.preview.emergentagent.com/api"
+BACKEND_URL = "http://localhost:8000/api"
 
 def test_endpoint(endpoint, method="GET", data=None):
     try:
