@@ -6,7 +6,7 @@
 ![Created By](https://img.shields.io/badge/Created%20By-Frostbyt3s-success?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-Premium-gold?style=for-the-badge)
 
-**Advanced Security Testing Suite - The Ultimate Pentesting Platform**
+**Advanced Security Auditing Suite - Enterprise Vulnerability Scanner**
 
 </div>
 
